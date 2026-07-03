@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A simple, fast, and minimalist URL shortener.">
+  <title>URL Shortener</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>URL Shortener</h1>
+    </header>
+
+    <main>
+      <!-- Shorten Form -->
+      <section class="form-section">
+        <form id="shorten-form" novalidate>
+          <div class="input-group">
+            <label for="url-input" class="visually-hidden">Enter a long URL to shorten</label>
+            <input 
+              type="url" 
+              id="url-input" 
+              placeholder="Paste a long URL here (e.g., https://example.com/very-long-path)"
+              required
+            >
+            <button type="submit" id="shorten-btn">Shorten</button>
+          </div>
+          <div id="error-message" class="error-message" aria-live="polite"></div>
+        </form>
+      </section>
+
+      <!-- Shortened Links List -->
+      <section class="links-section" id="links-section" style="display: none;">
+        <h2>Recent Links</h2>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Original URL</th>
+                <th>Short Link</th>
+                <th>Clicks</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="links-tbody">
+              <!-- Dynamically populated rows -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>&copy; 2026 URL Shortener. Simple, fast, and local.</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
