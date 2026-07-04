@@ -1,0 +1,148 @@
+/* 3D DEPTH BACKGROUND SYSTEM */
+.bg3d-container {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background: linear-gradient(135deg, #ffffff, #f9f9f9, #f0f0f0, #ffffff);
+  background-size: 400% 400%;
+  animation: gradientSweep 15s ease-in-out infinite;
+}
+
+/* Faint 48px Grid Overlay */
+.bg3d-grid {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(to right, rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Radial Vignette for Soft Studio Depth */
+.bg3d-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 30%, rgba(0, 0, 0, 0.015) 100%);
+}
+
+/* Floating Shapes base styles */
+.bg3d-shape {
+  position: absolute;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  background: transparent;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+/* Shapes configuration */
+.shape-square {
+  width: 80px;
+  height: 80px;
+  top: 15%;
+  left: 10%;
+  animation: floatSlowSquare 25s linear infinite;
+}
+
+.shape-circle {
+  width: 110px;
+  height: 110px;
+  border-radius: 50% !important; /* Circle requires border-radius override */
+  bottom: 20%;
+  right: 15%;
+  animation: floatSlowCircle 30s linear infinite;
+}
+
+.shape-triangle {
+  width: 90px;
+  height: 90px;
+  top: 25%;
+  right: 25%;
+  border: none;
+  animation: floatSlowTriangle 28s linear infinite;
+}
+
+.shape-triangle svg {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.04);
+  stroke-width: 1px;
+}
+
+.shape-line {
+  width: 120px;
+  height: 1px;
+  background-color: rgba(0, 0, 0, 0.04);
+  border: none;
+  bottom: 30%;
+  left: 20%;
+  animation: floatSlowLine 22s linear infinite;
+}
+
+.shape-square-2 {
+  width: 60px;
+  height: 60px;
+  bottom: 10%;
+  left: 45%;
+  transform: rotate(45deg);
+  animation: floatSlowSquareTwo 20s linear infinite;
+}
+
+/* GPU-friendly Animations */
+@keyframes gradientSweep {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes floatSlowSquare {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(30px, 40px) rotate(180deg); }
+  100% { transform: translate(0, 0) rotate(360deg); }
+}
+
+@keyframes floatSlowCircle {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-40px, -20px) scale(1.05); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes floatSlowTriangle {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(-20px, 50px) rotate(-180deg); }
+  100% { transform: translate(0, 0) rotate(-360deg); }
+}
+
+@keyframes floatSlowLine {
+  0% { transform: translate(0, 0) rotate(15deg); }
+  50% { transform: translate(40px, -30px) rotate(45deg); }
+  100% { transform: translate(0, 0) rotate(15deg); }
+}
+
+@keyframes floatSlowSquareTwo {
+  0% { transform: translate(0, 0) rotate(45deg); }
+  50% { transform: translate(15px, -40px) rotate(225deg); }
+  100% { transform: translate(0, 0) rotate(45deg); }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .bg3d-container {
+    animation: none !important;
+    background: #ffffff;
+  }
+  .bg3d-shape {
+    animation: none !important;
+  }
+}
+
+/* LIFT INTERACTION UTILITY CLASS */
+.bg3d-lift {
+  transition: transform 0.2s ease-in-out !important;
+}
+
+.bg3d-lift:hover {
+  transform: translateY(-2px) !important;
+}

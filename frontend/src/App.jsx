@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Background3D from "./components/Background3D";
 
 const isometricLogo = (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: "10px", display: "inline-block", verticalAlign: "middle" }}>
@@ -360,6 +361,7 @@ function App() {
 
   return (
     <div className="app-root-react">
+      <Background3D />
       {/* Toast Notification Banner */}
       {toastMessage && (
         <div style={{ position: "fixed", top: "10px", right: "10px", border: "1px solid #000", backgroundColor: "#fff", padding: "10px 15px", zIndex: 2000, fontWeight: "bold" }}>
@@ -519,7 +521,7 @@ function App() {
                 const shortUrl = `${window.location.origin}/${link.code}`;
 
                 return (
-                  <div className="link-card" key={link.code}>
+                  <div className="link-card bg3d-lift" key={link.code}>
                     {/* QR Code Placeholder Box */}
                     <div className="qr-placeholder-container">
                       QR CODE
