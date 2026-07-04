@@ -741,6 +741,7 @@ function App() {
     const q = searchQuery.trim().toLowerCase();
     filteredLinks = filteredLinks.filter(
       (l) =>
+        // logic to aplly filter
         l.shortCode.toLowerCase().includes(q) ||
         l.longUrl.toLowerCase().includes(q)
     );
