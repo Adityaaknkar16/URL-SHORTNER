@@ -70,6 +70,8 @@ const urlSchema = new mongoose.Schema({
         timestamp: { type: Date, default: Date.now },
         referrer: { type: String, default: '' },
         userAgent: { type: String, default: '' },
+        device: { type: String, default: 'Desktop' },
+        browser: { type: String, default: 'Other' },
       }
     ],
     default: [],

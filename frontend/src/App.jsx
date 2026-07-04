@@ -346,6 +346,7 @@ function App() {
     navigator.clipboard.writeText(fullLink).then(() => {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
+      triggerToast("Copied to clipboard!");
     });
   };
 
@@ -357,6 +358,23 @@ function App() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  };
+
+  const handleOpenAnalytics = async (link) => {
+    setAnalyticsLink(link);
+    try {
+      const res = await fetchWithUser(`/api/links/${link._id}/stats`);
+      if (res.ok) {
+        const data = await res.json();
+        setStatsData(data);
+        setIsAnalyticsOpen(true);
+      } else {
+        alert("Failed to fetch analytics.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error fetching analytics.");
+    }
   };
 
   // Handle Bulk Import
@@ -701,7 +719,7 @@ function App() {
 
 // Feature 8: Click Analytics
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
-  const [analyticsEvents, setAnalyticsEvents] = useState([]);
+  const [statsData, setStatsData] = useState(null);
   const [analyticsLink, setAnalyticsLink] = useState(null);
 
   // Feature 5: Search and Sort
@@ -752,6 +770,69 @@ function App() {
   }
 
   const activeGroup = groups.find((g) => g.id === activeGroupId);
+
+  const renderLineChart = (data) => {
+    if (!data || data.length === 0) return null;
+    const width = 450;
+    const height = 150;
+    const paddingLeft = 30;
+    const paddingRight = 15;
+    const paddingTop = 15;
+    const paddingBottom = 25;
+
+    const chartWidth = width - paddingLeft - paddingRight;
+    const chartHeight = height - paddingTop - paddingBottom;
+
+    const maxVal = Math.max(...data.map(d => d.count), 1);
+
+    const points = data.map((d, index) => {
+      const x = paddingLeft + (index / (data.length - 1)) * chartWidth;
+      const y = paddingTop + chartHeight - (d.count / maxVal) * chartHeight;
+      return { x, y, ...d };
+    });
+
+    const pathD = points.reduce((acc, p, index) => {
+      return index === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
+    }, "");
+
+    const areaD = points.length > 0 
+      ? `${pathD} L ${points[points.length - 1].x} ${paddingTop + chartHeight} L ${points[0].x} ${paddingTop + chartHeight} Z`
+      : "";
+
+    return (
+      <svg viewBox={`0 0 ${width} ${height}`} className="svg-chart" style={{ width: "100%", height: "auto" }}>
+        <line x1={paddingLeft} y1={paddingTop} x2={width - paddingRight} y2={paddingTop} stroke="#1f2937" strokeWidth="1" strokeDasharray="3 3" />
+        <line x1={paddingLeft} y1={paddingTop + chartHeight / 2} x2={width - paddingRight} y2={paddingTop + chartHeight / 2} stroke="#1f2937" strokeWidth="1" strokeDasharray="3 3" />
+        <line x1={paddingLeft} y1={paddingTop + chartHeight} x2={width - paddingRight} y2={paddingTop + chartHeight} stroke="#374151" strokeWidth="1" />
+
+        {areaD && <path d={areaD} fill="url(#chartGradient)" opacity="0.15" />}
+        {pathD && <path d={pathD} fill="none" stroke="var(--accent-color)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
+
+        {points.map((p, index) => (
+          <g key={index}>
+            <circle cx={p.x} cy={p.y} r="4" fill="var(--accent-color)" stroke="#111827" strokeWidth="1.5" />
+            <text x={p.x} y={paddingTop + chartHeight + 16} fill="var(--text-muted)" fontSize="9" textAnchor="middle" fontFamily="var(--font-mono)">
+              {p.date.substring(5)}
+            </text>
+            <text x={p.x} y={p.y - 8} fill="var(--text-color)" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="var(--font-mono)">
+              {p.count > 0 ? p.count : ""}
+            </text>
+          </g>
+        ))}
+
+        <text x={paddingLeft - 8} y={paddingTop + 3} fill="var(--text-muted)" fontSize="9" textAnchor="end" fontFamily="var(--font-mono)">{maxVal}</text>
+        <text x={paddingLeft - 8} y={paddingTop + chartHeight / 2 + 3} fill="var(--text-muted)" fontSize="9" textAnchor="end" fontFamily="var(--font-mono)">{Math.round(maxVal / 2)}</text>
+        <text x={paddingLeft - 8} y={paddingTop + chartHeight + 3} fill="var(--text-muted)" fontSize="9" textAnchor="end" fontFamily="var(--font-mono)">0</text>
+
+        <defs>
+          <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--accent-color)" />
+            <stop offset="100%" stopColor="var(--accent-color)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+      </svg>
+    );
+  };
 
   return (
     <div className="app-root-react">
@@ -1138,6 +1219,41 @@ function App() {
                         >
                           {link.shortCode}
                         </a>
+                        <div className="share-buttons-container">
+                          <a
+                            href={`https://api.whatsapp.com/send?text=${encodeURIComponent(shortUrl)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="share-btn"
+                            title="Share on WhatsApp"
+                          >
+                            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.713-1.458L0 24zm6.205-3.69c1.642.975 3.238 1.488 4.811 1.49h.005c5.688 0 10.316-4.625 10.32-10.312.001-2.756-1.071-5.348-3.02-7.299-1.95-1.952-4.542-3.026-7.303-3.027-5.69 0-10.318 4.625-10.322 10.314-.001 1.834.48 3.626 1.392 5.197L1.135 22.4l6.096-1.597h.031zm10.742-7.404c-.29-.146-1.715-.848-1.98-.944-.265-.096-.458-.144-.65.146-.193.291-.747.944-.916 1.137-.168.193-.337.217-.627.072-1.29-.646-2.181-1.127-3.056-2.628-.23-.396.23-.368.659-1.222.072-.146.036-.273-.018-.382-.054-.11-.458-1.102-.627-1.509-.164-.396-.346-.343-.458-.348-.11-.005-.24-.006-.37-.006-.13 0-.342.048-.52.24-.179.193-.68.664-.68 1.62s.696 1.878.793 2.01c.097.132 1.37 2.093 3.32 2.935.464.2.825.319 1.108.409.467.148.892.127 1.228.077.375-.056 1.715-.701 1.956-1.378.24-.678.24-1.258.17-1.378-.072-.12-.265-.22-.555-.366z"/>
+                            </svg>
+                          </a>
+                          <a
+                            href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shortUrl)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="share-btn"
+                            title="Share on X"
+                          >
+                            <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                            </svg>
+                          </a>
+                          <a
+                            href={`mailto:?subject=Shortened%20Link&body=${encodeURIComponent(shortUrl)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="share-btn"
+                            title="Share via Email"
+                          >
+                            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M0 3v18h24v-18h-24zm6.623 7.929l-4.623 3.937v-8.193l4.623 4.256zm1.77 1.632l3.607 3.321 3.607-3.321 6.812 7.439h-20.838l6.812-7.439zm2.223-2.049l-8.616-7.939h20.838l-8.616 7.939-1.803-1.66-1.803 1.66zm5.761 2.049l4.623-4.256v8.193l-4.623-3.937z"/>
+                            </svg>
+                          </a>
+                        </div>
                         {link.vanityCode && (
                           <span
                             style={{
@@ -1225,6 +1341,13 @@ function App() {
                         onClick={() => downloadSingleQr(link)}
                       >
                         QR PNG
+                      </button>
+
+                      <button
+                        className="card-action-btn"
+                        onClick={() => handleOpenAnalytics(link)}
+                      >
+                        Analytics
                       </button>
 
                       {!readOnlyMode && (
@@ -1635,36 +1758,88 @@ function App() {
         </div>
       )}
 {/* MODAL: ANALYTICS */}
-{isAnalyticsOpen && analyticsLink && (
+{isAnalyticsOpen && analyticsLink && statsData && (
   <div className="modal-overlay" style={{ display: "flex" }}>
-    <div className="modal-card" style={{ maxWidth: "600px", maxHeight: "80vh", overflowY: "auto" }}>
+    <div className="modal-card" style={{ maxWidth: "600px", maxHeight: "85vh", overflowY: "auto" }}>
       <div className="modal-header">
-        <h4>Analytics for {analyticsLink.shortCode}</h4>
+        <h4>Analytics: {analyticsLink.shortCode}</h4>
         <button className="modal-close" onClick={() => setIsAnalyticsOpen(false)}>&times;</button>
       </div>
-      <div className="modal-body">
-        {analyticsEvents.length === 0 ? (
-          <p>No click data available.</p>
-        ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={{ borderBottom: "1px solid var(--border-color)", padding: "4px" }}>Time</th>
-                <th style={{ borderBottom: "1px solid var(--border-color)", padding: "4px" }}>Referrer</th>
-                <th style={{ borderBottom: "1px solid var(--border-color)", padding: "4px" }}>User Agent</th>
-              </tr>
-            </thead>
-            <tbody>
-              {analyticsEvents.map((e, i) => (
-                <tr key={i}>
-                  <td style={{ padding: "4px" }}>{new Date(e.timestamp).toLocaleString()}</td>
-                  <td style={{ padding: "4px" }}>{e.referrer || "-"}</td>
-                  <td style={{ padding: "4px" }}>{e.userAgent || "-"}</td>
-                </tr>
+      <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        
+        {/* Total Clicks */}
+        <div style={{ background: "var(--bg-main)", padding: "16px", borderRadius: "8px", textAlign: "center", border: "1px solid var(--border-color)" }}>
+          <div style={{ fontSize: "12px", textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "1px" }}>Total Clicks</div>
+          <div style={{ fontSize: "32px", fontWeight: "bold", color: "var(--accent-color)" }}>{statsData.totalClicks}</div>
+        </div>
+
+        {/* Chart */}
+        <div>
+          <h5 style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "1px", color: "var(--text-muted)", marginBottom: "8px" }}>Clicks Over Time (Last 7 Days)</h5>
+          <div className="chart-container">
+            {renderLineChart(statsData.overTime)}
+          </div>
+        </div>
+
+        {/* Breakdowns Grid */}
+        <div className="stats-grid">
+          {/* Devices */}
+          <div className="stats-card">
+            <h5>Device Breakdown</h5>
+            {Object.entries(statsData.devices).map(([device, count]) => {
+              const pct = statsData.totalClicks > 0 ? Math.round((count / statsData.totalClicks) * 100) : 0;
+              return (
+                <div className="stats-bar-row" key={device}>
+                  <div className="stats-bar-header">
+                    <span>{device}</span>
+                    <span>{count} ({pct}%)</span>
+                  </div>
+                  <div className="stats-bar-bg">
+                    <div className="stats-bar-fill" style={{ width: `${pct}%` }}></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Browsers */}
+          <div className="stats-card">
+            <h5>Browser Breakdown</h5>
+            {Object.entries(statsData.browsers).map(([browser, count]) => {
+              const pct = statsData.totalClicks > 0 ? Math.round((count / statsData.totalClicks) * 100) : 0;
+              if (count === 0 && browser === 'Other') return null;
+              return (
+                <div className="stats-bar-row" key={browser}>
+                  <div className="stats-bar-header">
+                    <span>{browser}</span>
+                    <span>{count} ({pct}%)</span>
+                  </div>
+                  <div className="stats-bar-bg">
+                    <div className="stats-bar-fill" style={{ width: `${pct}%` }}></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Top Referrers */}
+        <div className="stats-card" style={{ width: "100%" }}>
+          <h5>Top Referrers</h5>
+          {statsData.topReferrers.length === 0 ? (
+            <div style={{ color: "var(--text-muted)", fontSize: "13px" }}>No referrer data.</div>
+          ) : (
+            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
+              {statsData.topReferrers.map((ref, idx) => (
+                <li key={idx} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--border-color)", paddingBottom: "6px" }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "12px", color: "var(--text-muted)" }}>{ref.name}</span>
+                  <span style={{ fontWeight: "bold" }}>{ref.count} clicks</span>
+                </li>
               ))}
-            </tbody>
-          </table>
-        )}
+            </ul>
+          )}
+        </div>
+
       </div>
       <div className="modal-footer">
         <button className="btn-action" onClick={() => setIsAnalyticsOpen(false)}>Close</button>

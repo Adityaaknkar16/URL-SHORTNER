@@ -457,4 +457,76 @@ router.get('/links/:id/analytics', requireUser, async (req, res) => {
   }
 });
 
+// @route   GET /api/links/:id/stats
+// @desc    Get aggregated stats for a specific link
+router.get('/links/:id/stats', requireUser, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const link = await Url.findOne({ _id: id, userId: req.userId });
+    if (!link) {
+      return res.status(404).json({ error: 'Link not found or unauthorized' });
+    }
+
+    const clickEvents = link.clickEvents || [];
+    
+    const devices = { Mobile: 0, Tablet: 0, Desktop: 0 };
+    const browsers = { Chrome: 0, Safari: 0, Firefox: 0, Edge: 0, Opera: 0, Other: 0 };
+    const referrersMap = {};
+    const overTimeMap = {};
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      overTimeMap[dateStr] = 0;
+    }
+
+    clickEvents.forEach(evt => {
+      const dev = evt.device || 'Desktop';
+      devices[dev] = (devices[dev] || 0) + 1;
+
+      const br = evt.browser || 'Other';
+      browsers[br] = (browsers[br] || 0) + 1;
+
+      let ref = 'Direct/Unknown';
+      if (evt.referrer) {
+        try {
+          ref = new URL(evt.referrer).hostname || evt.referrer;
+        } catch {
+          ref = evt.referrer;
+        }
+      }
+      referrersMap[ref] = (referrersMap[ref] || 0) + 1;
+
+      if (evt.timestamp) {
+        const dateStr = new Date(evt.timestamp).toISOString().split('T')[0];
+        if (overTimeMap[dateStr] !== undefined) {
+          overTimeMap[dateStr] += 1;
+        }
+      }
+    });
+
+    const overTime = Object.keys(overTimeMap).sort().map(date => ({
+      date,
+      count: overTimeMap[date]
+    }));
+
+    const topReferrers = Object.keys(referrersMap)
+      .map(ref => ({ name: ref, count: referrersMap[ref] }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return res.json({
+      totalClicks: link.clicks || 0,
+      devices,
+      browsers,
+      topReferrers,
+      overTime
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Server Error' });
+  }
+});
+
 export default router;
