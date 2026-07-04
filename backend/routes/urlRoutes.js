@@ -187,7 +187,7 @@ router.get('/validate-vanity', requireUser, async (req, res) => {
 // @route   POST /api/shorten
 // @desc    Create a short URL
 router.post('/shorten', requireUser, async (req, res) => {
-  const { id, longUrl, vanityCode, groupId, qrCode, expiresAt, maxClicks, password, tags } = req.body;
+  const { id, longUrl, vanityCode, groupId, qrCode, expiresAt, maxClicks, password, tags, shortCode } = req.body;
 
   if (!longUrl || longUrl.trim() === '') {
     return res.status(400).json({ error: 'URL is required.' });
@@ -219,6 +219,37 @@ router.post('/shorten', requireUser, async (req, res) => {
         return res.status(400).json({ error: 'Vanity code is already taken.' });
       }
       finalCode = cleanVanity;
+    } else if (shortCode && shortCode.trim() !== '') {
+      const cleanShort = shortCode.trim();
+      const collision = await Url.findOne({
+        $or: [
+          { shortCode: cleanShort },
+          { vanityCode: cleanShort }
+        ]
+      });
+      if (collision) {
+        // Fallback to generating a unique one if collision occurs
+        let isUnique = false;
+        let attempts = 0;
+        while (!isUnique && attempts < 10) {
+          finalCode = generateShortCode();
+          const existing = await Url.findOne({
+            $or: [
+              { shortCode: finalCode },
+              { vanityCode: finalCode }
+            ]
+          });
+          if (!existing) {
+            isUnique = true;
+          }
+          attempts++;
+        }
+        if (!isUnique) {
+          return res.status(500).json({ error: 'Failed to generate unique code.' });
+        }
+      } else {
+        finalCode = cleanShort;
+      }
     } else {
       // Generate unique short code (global uniqueness check)
       let isUnique = false;
