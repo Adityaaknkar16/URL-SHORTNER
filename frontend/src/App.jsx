@@ -256,7 +256,7 @@ function App() {
   const getShortUrl = (code) => {
     const origin = window.location.port === "5173"
       ? `${window.location.protocol}//${window.location.hostname}:5000`
-      : window.location.origin;
+      : "https://url-shortner-ti01.onrender.com";
     return `${origin}/${code}`;
   };
 
@@ -1222,7 +1222,7 @@ function App() {
                           target="_blank"
                           rel="noreferrer"
                         >
-                          {link.shortCode}
+                          {shortUrl.replace(/^https?:\/\//, "")}
                         </a>
                         <div className="share-buttons-container">
                           <a

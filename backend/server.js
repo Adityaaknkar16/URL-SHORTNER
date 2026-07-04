@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import bcrypt from 'bcryptjs';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
 import urlRoutes from './routes/urlRoutes.js';
@@ -150,15 +151,16 @@ app.post('/verify-password/:code', express.json(), async (req, res) => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Serve static frontend files in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+// Serve static frontend files in production if dist exists
+const distPath = path.join(__dirname, '../frontend/dist');
+if (process.env.NODE_ENV === 'production' && fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
   app.get('*', (req, res) => {
-    res.sendFile(path.resolve(__dirname, '../frontend', 'dist', 'index.html'));
+    res.sendFile(path.resolve(distPath, 'index.html'));
   });
 } else {
   app.get('/', (req, res) => {
-    res.send('URL Shortener API is running. Switch to production mode or run frontend via dev server.');
+    res.send('URL Shortener API is running.');
   });
 }
 
