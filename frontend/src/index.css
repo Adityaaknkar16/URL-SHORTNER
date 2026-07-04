@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
 /* PURE MONOCHROME DESIGN SYSTEM */
 :root {
   --bg-main: #ffffff;
@@ -8,7 +10,7 @@
   --color-light-gray: #999999;
   --color-border-subtle: #dddddd;
   
-  --font-stack: -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-stack: 'VT323', monospace;
   --font-weight-bold: 700;
   --font-weight-semibold: 600;
   --font-weight-normal: 400;
@@ -27,7 +29,7 @@
 body {
   background-color: var(--bg-main);
   color: var(--color-black);
-  font-size: 14px;
+  font-size: 19px;
   line-height: 1.5;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;

@@ -1,5 +1,29 @@
 import React, { useState, useEffect } from "react";
 
+const isometricLogo = (
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: "10px", display: "inline-block", verticalAlign: "middle" }}>
+    <polygon points="12 2, 22 7, 12 12, 2 7" />
+    <polygon points="2 7, 12 12, 12 22, 2 17" />
+    <polygon points="22 7, 12 12, 12 22, 22 17" />
+  </svg>
+);
+
+const isometricFolderIcon = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: "8px", display: "inline-block", verticalAlign: "middle" }}>
+    <polygon points="4 9, 12 5, 20 9, 12 13" />
+    <polygon points="4 9, 12 13, 12 19, 4 15" />
+    <polygon points="20 9, 12 13, 12 19, 20 15" />
+  </svg>
+);
+
+const isometricLinkIcon = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: "8px", display: "inline-block", verticalAlign: "middle" }}>
+    <polygon points="6 10, 12 7, 18 10, 12 13" />
+    <line x1="12" y1="13" x2="12" y2="18" />
+    <polygon points="6 15, 12 12, 18 15, 12 18" />
+  </svg>
+);
+
 function App() {
   // --- CLIENT-SIDE ROUTER / REDIRECT LOGIC ---
   const [redirecting, setRedirecting] = useState(false);
@@ -350,7 +374,7 @@ function App() {
             <h3>Groups</h3>
             <ul className="group-list">
               <li className={`group-item ${activeGroupId === "all" ? "active" : ""}`} onClick={() => setActiveGroupId("all")}>
-                <span>All Links</span>
+                <span>{isometricFolderIcon} All Links</span>
                 <span className="group-badge-count">{links.length}</span>
               </li>
 
@@ -358,7 +382,7 @@ function App() {
                 const count = links.filter((l) => l.groupId === g.id).length;
                 return (
                   <li key={g.id} className={`group-item ${activeGroupId === g.id ? "active" : ""}`} onClick={() => setActiveGroupId(g.id)}>
-                    <span>{g.name}</span>
+                    <span>{isometricFolderIcon} {g.name}</span>
                     <span className="group-badge-count">{count}</span>
                   </li>
                 );
@@ -376,7 +400,7 @@ function App() {
           <div className="header-banner">
             <div>
               <h1>
-                {activeGroupId === "all" ? "All Links" : groups.find((g) => g.id === activeGroupId)?.name || "Group"}
+                {isometricLogo} {activeGroupId === "all" ? "All Links" : groups.find((g) => g.id === activeGroupId)?.name || "Group"}
               </h1>
               <p>Minimal Black/White URL Shortener Dashboard</p>
             </div>
@@ -506,7 +530,7 @@ function App() {
                     <div className="link-details">
                       <div className="link-header-row">
                         <a className="short-link-display" href={shortUrl} target="_blank" rel="noreferrer">
-                          {window.location.hostname}/{link.code}
+                          {isometricLinkIcon} {window.location.hostname}/{link.code}
                         </a>
                         <span className="group-tag">{grpName}</span>
                         {link.password && <span title="Password Protected">🔒</span>}
