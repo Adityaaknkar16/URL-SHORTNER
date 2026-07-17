@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Background3D from "./components/Background3D";
+import { api } from "./api";
+import QRCode from "qrcode";
 
 const isometricLogo = (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: "10px", display: "inline-block", verticalAlign: "middle" }}>
@@ -25,86 +27,38 @@ const isometricLinkIcon = (
   </svg>
 );
 
-function App() {
-  // --- CLIENT-SIDE ROUTER / REDIRECT LOGIC ---
-  const [redirecting, setRedirecting] = useState(false);
-  const [redirectError, setRedirectError] = useState("");
-  const [pwdRequiredCode, setPwdRequiredCode] = useState(null);
-  const [inputPwd, setInputPwd] = useState("");
-  const [pwdError, setPwdError] = useState("");
+function LinkQRCode({ url }) {
+  const [qrSrc, setQrSrc] = useState("");
 
   useEffect(() => {
-    const path = window.location.pathname.substring(1); // Get code from pathname (e.g. /CZul)
-    if (!path || path.trim() === "" || path === "index.html") {
-      return;
-    }
+    if (!url) return;
+    QRCode.toDataURL(url, { width: 120, margin: 1 })
+      .then(setQrSrc)
+      .catch((err) => console.error(err));
+  }, [url]);
 
-    // Attempt client-side redirect lookup
-    const allLinks = JSON.parse(localStorage.getItem("local_links") || "[]");
-    const foundLink = allLinks.find(
-      (l) => l.code.toLowerCase() === path.trim().toLowerCase()
+  if (!qrSrc) {
+    return (
+      <div className="qr-placeholder-container" style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>
+        Generating...
+      </div>
     );
+  }
 
-    if (foundLink) {
-      setRedirecting(true);
+  return (
+    <div className="qr-placeholder-container" style={{ padding: "0", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+      <img src={qrSrc} alt="QR Code" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+    </div>
+  );
+}
 
-      // Check Expiry Date
-      if (foundLink.expiry && new Date() > new Date(foundLink.expiry)) {
-        setRedirectError("This link has expired (passed its expiry date).");
-        return;
-      }
-
-      // Check Max Clicks Limit
-      if (foundLink.maxClicks && foundLink.clicks >= parseInt(foundLink.maxClicks)) {
-        setRedirectError("This link has reached its maximum click limit.");
-        return;
-      }
-
-      // Check Password Protection
-      if (foundLink.password && foundLink.password.trim() !== "") {
-        setPwdRequiredCode(foundLink.code);
-        return;
-      }
-
-      // Perform direct redirection
-      executeRedirect(foundLink, allLinks);
-    } else {
-      // Keep it on dashboard if short code not found but log an alert
-      console.warn("Short URL not found in localStorage.");
-    }
-  }, []);
-
-  const executeRedirect = (link, allLinks) => {
-    // Increment click count in localStorage
-    const updated = allLinks.map((l) => {
-      if (l.code === link.code) {
-        return { ...l, clicks: (l.clicks || 0) + 1 };
-      }
-      return l;
-    });
-    localStorage.setItem("local_links", JSON.stringify(updated));
-
-    // Redirect user to the destination URL
-    window.location.href = link.originalURL;
-  };
-
-  const handlePasswordSubmit = (e) => {
-    e.preventDefault();
-    const allLinks = JSON.parse(localStorage.getItem("local_links") || "[]");
-    const foundLink = allLinks.find((l) => l.code === pwdRequiredCode);
-
-    if (foundLink && foundLink.password === inputPwd) {
-      setPwdError("");
-      executeRedirect(foundLink, allLinks);
-    } else {
-      setPwdError("Incorrect password.");
-    }
-  };
-
+function App() {
   // --- MAIN DASHBOARD APP LOGIC ---
   const [links, setLinks] = useState([]);
   const [groups, setGroups] = useState([]);
   const [activeGroupId, setActiveGroupId] = useState("all");
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiError, setApiError] = useState("");
 
   // Form States
   const [url, setUrl] = useState("");
@@ -127,19 +81,25 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState("date-desc");
 
-  // Load / Save States to LocalStorage
+  // Load States from API
   useEffect(() => {
-    // Initialise Default Groups if empty
-    let storedGroups = JSON.parse(localStorage.getItem("local_groups") || "[]");
-    if (storedGroups.length === 0) {
-      storedGroups = [{ id: "uncategorized", name: "Uncategorized" }];
-      localStorage.setItem("local_groups", JSON.stringify(storedGroups));
-    }
-    setGroups(storedGroups);
-
-    // Initialise Links
-    const storedLinks = JSON.parse(localStorage.getItem("local_links") || "[]");
-    setLinks(storedLinks);
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const [fetchedGroups, fetchedLinks] = await Promise.all([
+          api.getGroups(),
+          api.getLinks(),
+        ]);
+        setGroups(fetchedGroups);
+        setLinks(fetchedLinks);
+      } catch (err) {
+        console.error(err);
+        setApiError("Failed to fetch data from the server.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
   const triggerToast = (msg) => {
@@ -147,91 +107,62 @@ function App() {
     setTimeout(() => setToastMessage(""), 2000);
   };
 
-  // Helper to generate a 6 character code
-  const generateRandomCode = () => {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let result = "";
-    for (let i = 0; i < 6; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  };
-
-  const handleShorten = (e) => {
+  const handleShorten = async (e) => {
     e.preventDefault();
     if (!url || url.trim() === "") {
       alert("Please enter a valid URL");
       return;
     }
 
-    let code = "";
-    if (useCustomCode && vanityCode.trim() !== "") {
-      code = vanityCode.trim().toLowerCase();
-      // Check collision
-      if (links.some((l) => l.code === code)) {
-        alert("This vanity code is already taken.");
-        return;
+    try {
+      const data = {
+        longUrl: url.trim(),
+        groupId: assignedGroupId,
+        expiresAt: expiresAt || undefined,
+        maxClicks: maxClicks ? parseInt(maxClicks) : undefined,
+        password: linkPassword || undefined,
+      };
+
+      if (useCustomCode && vanityCode.trim() !== "") {
+        data.vanityCode = vanityCode.trim().toLowerCase();
       }
-    } else {
-      let isUnique = false;
-      let attempts = 0;
-      while (!isUnique && attempts < 20) {
-        code = generateRandomCode();
-        if (!links.some((l) => l.code === code)) {
-          isUnique = true;
-        }
-        attempts++;
-      }
+
+      const newLink = await api.shortenLink(data);
+      setLinks([newLink, ...links]);
+
+      // Reset Form Fields
+      setUrl("");
+      setUseCustomCode(false);
+      setVanityCode("");
+      setExpiresAt("");
+      setMaxClicks("");
+      setLinkPassword("");
+
+      triggerToast("Link created successfully.");
+    } catch (err) {
+      alert(err.message || "Failed to shorten URL.");
     }
-
-    const newLink = {
-      code,
-      originalURL: url.trim().startsWith("http") ? url.trim() : `http://${url.trim()}`,
-      groupId: assignedGroupId,
-      createdAt: new Date().toISOString(),
-      clicks: 0,
-      expiry: expiresAt || null,
-      maxClicks: maxClicks ? parseInt(maxClicks) : null,
-      password: linkPassword || null,
-    };
-
-    const updatedLinks = [newLink, ...links];
-    setLinks(updatedLinks);
-    localStorage.setItem("local_links", JSON.stringify(updatedLinks));
-
-    // Reset Form Fields
-    setUrl("");
-    setUseCustomCode(false);
-    setVanityCode("");
-    setExpiresAt("");
-    setMaxClicks("");
-    setLinkPassword("");
-
-    triggerToast("Link created successfully.");
   };
 
   // Create Group Handler
-  const handleCreateGroup = (e) => {
+  const handleCreateGroup = async (e) => {
     e.preventDefault();
     if (!newGroupName || newGroupName.trim() === "") return;
 
-    const newGroup = {
-      id: "group-" + Date.now(),
-      name: newGroupName.trim(),
-    };
-
-    const updatedGroups = [...groups, newGroup];
-    setGroups(updatedGroups);
-    localStorage.setItem("local_groups", JSON.stringify(updatedGroups));
-
-    setNewGroupName("");
-    setIsAddGroupOpen(false);
-    triggerToast(`Group "${newGroup.name}" created.`);
+    try {
+      const newGroup = await api.createGroup(newGroupName.trim());
+      setGroups([...groups, newGroup]);
+      setNewGroupName("");
+      setIsAddGroupOpen(false);
+      triggerToast(`Group "${newGroup.name}" created.`);
+    } catch (err) {
+      alert(err.message || "Failed to create group.");
+    }
   };
 
   // Copy Single link URL
-  const handleCopy = (code, id) => {
-    const fullLink = `${window.location.origin}/${code}`;
+  const handleCopy = (shortCode, id) => {
+    const fullLink = `${window.location.origin}/${shortCode}`;
     navigator.clipboard.writeText(fullLink).then(() => {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
@@ -241,12 +172,12 @@ function App() {
 
   // Copy All link URLs currently filtered
   const handleCopyAllLinks = () => {
-    const filtered = activeGroupId === "all" ? links : links.filter((l) => l.groupId === activeGroupId);
-    if (filtered.length === 0) {
+    const filteredLinks = activeGroupId === "all" ? links : links.filter((l) => l.groupId === activeGroupId);
+    if (filteredLinks.length === 0) {
       alert("No links to copy.");
       return;
     }
-    const txt = filtered.map((l) => `${window.location.origin}/${l.code}`).join("\n");
+    const txt = filteredLinks.map((l) => `${window.location.origin}/${l.shortCode}`).join("\n");
     navigator.clipboard.writeText(txt).then(() => {
       triggerToast("All short links copied to clipboard.");
     });
@@ -254,88 +185,81 @@ function App() {
 
   // Export Filtered Links as CSV
   const handleExportCsv = () => {
-    const filtered = activeGroupId === "all" ? links : links.filter((l) => l.groupId === activeGroupId);
-    if (filtered.length === 0) {
+    const filteredLinks = activeGroupId === "all" ? links : links.filter((l) => l.groupId === activeGroupId);
+    if (filteredLinks.length === 0) {
       alert("No links to export.");
       return;
     }
     let csv = "Short URL,Original URL,Clicks,Created Date\n";
-    filtered.forEach((l) => {
-      const escapedUrl = l.originalURL.replace(/"/g, '""');
-      csv += `"${window.location.origin}/${l.code}","${escapedUrl}",${l.clicks || 0},"${new Date(l.createdAt).toLocaleDateString()}"\n`;
+    filteredLinks.forEach((l) => {
+      const escapedUrl = (l.longUrl || "").replace(/"/g, '""');
+      csv += `"${window.location.origin}/${l.shortCode}","${escapedUrl}",${l.clicks || 0},"${new Date(l.createdAt).toLocaleDateString()}"\n`;
     });
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `links_export_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const downloadLink = document.createElement("a");
+    downloadLink.href = URL.createObjectURL(blob);
+    downloadLink.setAttribute("download", `links_export_${Date.now()}.csv`);
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
   };
 
   // Delete Individual Link
-  const handleDeleteLink = (code) => {
-    if (confirm(`Delete short link "/${code}"?`)) {
-      const updated = links.filter((l) => l.code !== code);
-      setLinks(updated);
-      localStorage.setItem("local_links", JSON.stringify(updated));
-      triggerToast("Link deleted.");
+  const handleDeleteLink = async (id, shortCode) => {
+    if (confirm(`Delete short link "/${shortCode}"?`)) {
+      try {
+        await api.deleteLink(id);
+        setLinks(links.filter((l) => l._id !== id));
+        triggerToast("Link deleted.");
+      } catch (err) {
+        alert(err.message || "Failed to delete link.");
+      }
     }
   };
 
   // Delete All Links in currently active view
-  const handleDeleteAllInGroup = () => {
+  const handleDeleteAllInGroup = async () => {
     const warning = activeGroupId === "all"
       ? "Delete ALL links across all groups? This cannot be undone."
       : "Delete all links in this group? This cannot be undone.";
 
     if (confirm(warning)) {
-      let updated;
-      if (activeGroupId === "all") {
-        updated = [];
-      } else {
-        updated = links.filter((l) => l.groupId !== activeGroupId);
+      try {
+        await api.deleteLinksInGroup(activeGroupId);
+        if (activeGroupId === "all") {
+          setLinks([]);
+        } else {
+          setLinks(links.filter((l) => l.groupId !== activeGroupId));
+        }
+        triggerToast("Links deleted.");
+      } catch (err) {
+        alert(err.message || "Failed to delete links.");
       }
-      setLinks(updated);
-      localStorage.setItem("local_links", JSON.stringify(updated));
-      triggerToast("Links deleted.");
     }
   };
 
-  // Render Redirection / Password Lock Screens
-  if (redirecting) {
+  if (isLoading) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", backgroundColor: "#ffffff" }}>
-        <div style={{ border: "1px solid #000000", padding: "40px", maxWidth: "450px", width: "90%", backgroundColor: "#ffffff" }}>
-          {redirectError ? (
-            <>
-              <h2 style={{ fontSize: "20px", marginBottom: "15px" }}>Redirect Error</h2>
-              <p style={{ color: "#666666", marginBottom: "20px" }}>{redirectError}</p>
-              <button onClick={() => window.location.href = "/"} className="btn-primary" style={{ padding: "10px 20px" }}>
-                Go to Dashboard
-              </button>
-            </>
-          ) : pwdRequiredCode ? (
-            <form onSubmit={handlePasswordSubmit}>
-              <h2 style={{ fontSize: "18px", marginBottom: "10px" }}>Password Protected</h2>
-              <p style={{ color: "#666666", fontSize: "12px", marginBottom: "15px" }}>This link requires a password to access.</p>
-              {pwdError && <p style={{ color: "red", fontSize: "12px", marginBottom: "10px" }}>{pwdError}</p>}
-              <input
-                type="password"
-                placeholder="Enter password"
-                value={inputPwd}
-                onChange={(e) => setInputPwd(e.target.value)}
-                style={{ padding: "10px", width: "100%", border: "1px solid #000000", marginBottom: "15px", outline: "none" }}
-                required
-              />
-              <button type="submit" className="btn-primary" style={{ width: "100%", padding: "10px" }}>
-                Submit & Redirect
-              </button>
-            </form>
-          ) : (
-            <p style={{ fontWeight: "600" }}>Redirecting...</p>
-          )}
+        <Background3D />
+        <div style={{ border: "1px solid #000000", padding: "40px", maxWidth: "450px", width: "90%", backgroundColor: "#ffffff", zIndex: 1, textAlign: "center" }}>
+          <p style={{ fontWeight: "600" }}>Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (apiError) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", backgroundColor: "#ffffff" }}>
+        <Background3D />
+        <div style={{ border: "1px solid #000000", padding: "40px", maxWidth: "450px", width: "90%", backgroundColor: "#ffffff", zIndex: 1 }}>
+          <h2 style={{ fontSize: "20px", marginBottom: "15px" }}>Error Loading Dashboard</h2>
+          <p style={{ color: "#666666", marginBottom: "20px" }}>{apiError}</p>
+          <button onClick={() => window.location.reload()} className="btn-primary" style={{ padding: "10px 20px" }}>
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -347,7 +271,7 @@ function App() {
   if (searchQuery.trim()) {
     const q = searchQuery.trim().toLowerCase();
     filtered = filtered.filter(
-      (l) => l.code.toLowerCase().includes(q) || l.originalURL.toLowerCase().includes(q)
+      (l) => (l.shortCode || "").toLowerCase().includes(q) || (l.longUrl || "").toLowerCase().includes(q)
     );
   }
 
@@ -518,27 +442,23 @@ function App() {
             ) : (
               filtered.map((link) => {
                 const grpName = groups.find((g) => g.id === link.groupId)?.name || "Uncategorized";
-                const shortUrl = `${window.location.origin}/${link.code}`;
+                const shortUrl = `${window.location.origin}/${link.shortCode}`;
 
                 return (
-                  <div className="link-card bg3d-lift" key={link.code}>
-                    {/* QR Code Placeholder Box */}
-                    <div className="qr-placeholder-container">
-                      QR CODE
-                      <br />
-                      PLACEHOLDER
-                    </div>
+                  <div className="link-card bg3d-lift" key={link.shortCode}>
+                    {/* Real QR Code Component */}
+                    <LinkQRCode url={shortUrl} />
 
                     <div className="link-details">
                       <div className="link-header-row">
                         <a className="short-link-display" href={shortUrl} target="_blank" rel="noreferrer">
-                          {isometricLinkIcon} {window.location.hostname}/{link.code}
+                          {isometricLinkIcon} {window.location.hostname}/{link.shortCode}
                         </a>
                         <span className="group-tag">{grpName}</span>
                         {link.password && <span title="Password Protected">🔒</span>}
                       </div>
 
-                      <div className="original-url-display">Original: {link.originalURL}</div>
+                      <div className="original-url-display">Original: {link.longUrl}</div>
 
                       <div className="link-meta-row">
                         <span>
@@ -546,18 +466,18 @@ function App() {
                           {link.maxClicks && <span> / {link.maxClicks} max</span>}
                         </span>
                         <span>Created: {new Date(link.createdAt).toLocaleDateString()}</span>
-                        {link.expiry && <span>Expires: {new Date(link.expiry).toLocaleDateString()}</span>}
+                        {link.expiresAt && <span>Expires: {new Date(link.expiresAt).toLocaleDateString()}</span>}
                       </div>
                     </div>
 
                     <div className="link-card-actions">
                       <button
-                        className={`card-action-btn copy-btn ${copiedId === link.code ? "copied" : ""}`}
-                        onClick={() => handleCopy(link.code, link.code)}
+                        className={`card-action-btn copy-btn ${copiedId === link._id ? "copied" : ""}`}
+                        onClick={() => handleCopy(link.shortCode, link._id)}
                       >
-                        {copiedId === link.code ? "Copied" : "Copy"}
+                        {copiedId === link._id ? "Copied" : "Copy"}
                       </button>
-                      <button className="card-action-btn btn-delete" style={{ color: "red" }} onClick={() => handleDeleteLink(link.code)}>
+                      <button className="card-action-btn btn-delete" style={{ color: "red" }} onClick={() => handleDeleteLink(link._id, link.shortCode)}>
                         Delete
                       </button>
                     </div>

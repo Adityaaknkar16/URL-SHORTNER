@@ -3,6 +3,14 @@
     {
       "source": "/api/:path*",
       "destination": "https://url-shortner-ti01.onrender.com/api/:path*"
+    },
+    {
+      "source": "/:code([a-zA-Z0-9\\-]+)",
+      "destination": "https://url-shortner-ti01.onrender.com/:code"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
     }
   ]
 }
