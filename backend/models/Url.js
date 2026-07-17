@@ -33,7 +33,7 @@ const urlSchema = new mongoose.Schema({
   },
   qrCode: {
     type: String,
-    required: true,
+    default: '',
   },
   groupId: {
     type: String,
