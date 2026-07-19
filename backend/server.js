@@ -151,12 +151,13 @@ app.post('/verify-password/:code', express.json(), async (req, res) => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Serve static frontend files in production if dist exists
+// Serve static frontend files in production if dist and index.html exist
 const distPath = path.join(__dirname, '../frontend/dist');
-if (process.env.NODE_ENV === 'production' && fs.existsSync(distPath)) {
+const indexPath = path.join(distPath, 'index.html');
+if (process.env.NODE_ENV === 'production' && fs.existsSync(indexPath)) {
   app.use(express.static(distPath));
   app.get('*', (req, res) => {
-    res.sendFile(path.resolve(distPath, 'index.html'));
+    res.sendFile(path.resolve(indexPath));
   });
 } else {
   app.get('/', (req, res) => {
